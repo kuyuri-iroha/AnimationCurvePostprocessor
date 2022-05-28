@@ -37,7 +37,7 @@ public class KeyframeReductionTool : AssetPostprocessor
             {
                 var curve = AnimationUtility.GetEditorCurve(modifiedClip, binding);
                 
-                Reduction(out var reducedCurve, curve);
+                Reduction(out var reducedCurve, curve, 8f);
                 //Smoothing(out var smoothedCurve, reducedCurve);
                 
                 Debug.Log($"{binding.path}/{binding.propertyName}: {reducedCurve.keys.Length}");
@@ -140,7 +140,7 @@ public class KeyframeReductionTool : AssetPostprocessor
         var dist = 0f;
         for(var  i = 1; i < inKeyframes.Length - 1; i++)
         {
-            var d = Mathf.Sqrt(CalcDistanceFromPointToLine(first, inKeyframes[i], last));
+            var d = Mathf.Sqrt(CalcDistanceSqFromPointToLine(first, inKeyframes[i], last));
             if(dist < d)
             {
                 dist = d;
@@ -165,26 +165,26 @@ public class KeyframeReductionTool : AssetPostprocessor
         }
     }
 
-    private static float CalcDistanceFromPointToLine(Keyframe start, Keyframe mid, Keyframe end)
+    private static float CalcDistanceSqFromPointToLine(Keyframe start, Keyframe mid, Keyframe end)
     {
-        var a = end.time - start.time;
-        var b = end.value - start.value;
-        var a2 = a * a;
-        var b2 = b * b;
-        var r2 = a2 + b2;
-        var tt = -(a * (start.time - mid.time) + b * (start.value - mid.value));
-
-        if (tt < 0)
+        float PointDistanceSq(float x0, float y0, float x1, float y1)
         {
-            return Mathf.Pow(start.time - mid.time, 2) + Mathf.Pow(start.value - mid.value, 2);
+            return Mathf.Pow(x1 - x0, 2) + Mathf.Pow(y1 - y0, 2);
         }
-
-        if (r2 < tt)
+        
+        var lineLength = Mathf.Sqrt(PointDistanceSq(start.time, start.value, end.time, end.value));
+        if (lineLength == 0)
         {
-            return Mathf.Pow(end.time - mid.time, 2) + Mathf.Pow(end.value - mid.value, 2);
+            return PointDistanceSq(start.time, start.value, mid.time, mid.value);
         }
-        var f1 = a * (start.value - mid.value) - b * (start.time - mid.time);
-        return Mathf.Pow(f1, 2) / r2;
+        var t = ((mid.time - start.time) * (end.time - start.time) + (mid.value - start.value) * (end.value - start.value)) / lineLength;
+        return t switch
+        {
+            < 0 => PointDistanceSq(mid.time, mid.value, start.time, start.value),
+            > 1 => PointDistanceSq(mid.time, mid.value, end.time, end.value),
+            _ => PointDistanceSq(mid.time, mid.value, start.time + t * (end.time - start.time),
+                start.value + t * (end.value - start.value))
+        };
     }
 
     // スムージング
