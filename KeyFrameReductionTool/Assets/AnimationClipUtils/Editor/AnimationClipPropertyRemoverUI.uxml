@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <ui:TextField picking-mode="Ignore" label="Property Name" value="filler text" text="filler text" name="PropertyName" />
+    <ui:Toggle label="Remove less than 2 keys property" name="RemoveFlag" />
+    <ui:Button tabindex="-1" text="Search remove list" display-tooltip-when-elided="true" name="SearchButton" />
+    <ui:TextField picking-mode="Ignore" value="filler text" text="Result" readonly="true" multiline="true" name="ResultTextField" style="height: 42px;" />
+    <ui:VisualElement style="height: 64px; justify-content: center; align-items: center;">
+        <ui:Button tabindex="-1" text="Export" display-tooltip-when-elided="true" name="ExportButton" style="width: 120px;" />
+    </ui:VisualElement>
+</ui:UXML>
