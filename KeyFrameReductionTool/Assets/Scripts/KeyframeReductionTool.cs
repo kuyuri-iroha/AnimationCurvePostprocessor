@@ -33,19 +33,27 @@ public class KeyframeReductionTool : AssetPostprocessor
             RemoveProperties(out modifiedClip, animClip, RemoveProps);
             
             // 選択した各AnimationCurveを処理
+            var newCurveBindings = new List<EditorCurveBinding>();
+            var newCurves = new List<AnimationCurve>();
             foreach (var binding in AnimationUtility.GetCurveBindings(modifiedClip).ToArray())
             {
                 var curve = AnimationUtility.GetEditorCurve(modifiedClip, binding);
                 
-                Reduction(out var reducedCurve, curve, 8f);
-                //Smoothing(out var smoothedCurve, reducedCurve);
+                Reduction(out var reducedCurve, curve, 0.5f);
+                Smoothing(out var smoothedCurve, reducedCurve);
                 
-                Debug.Log($"{binding.path}/{binding.propertyName}: {reducedCurve.keys.Length}");
-                AnimationUtility.SetEditorCurve(modifiedClip, binding, reducedCurve);
+                newCurveBindings.Add(binding);
+                newCurves.Add(smoothedCurve);
             }
             
+            // リダクション済みAnimationClipの生成
+            var resultClip = new AnimationClip();
+            AnimationUtility.SetEditorCurves(resultClip,newCurveBindings.ToArray(), newCurves.ToArray());
+            EditorUtility.SetDirty(resultClip);
+            resultClip.name = modifiedClip.name.Replace(".anim","_reduced.anim");
+            
             // AnimationClipの書き出し
-            WriteAnimationCurve(modifiedClip, Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path));
+            WriteAnimationCurve(resultClip, Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path));
         }
     }
     
@@ -97,24 +105,6 @@ public class KeyframeReductionTool : AssetPostprocessor
         }
     }
     
-    // Record範囲の決定と削除
-    private static void DetectRecordRange(out RecordRageData[] recordRangeDatas, out AnimationCurve removedCurve,
-        AnimationCurve sourceCurve, float brakingTime = 3f)
-    {
-        removedCurve = new AnimationCurve();
-        
-        var elapsedTime = 0f;
-        var tmpRecordRangeDatas = new List<RecordRageData>();
-        for (var i = 0; i < sourceCurve.keys.Length; i++)
-        {
-            //if( <= sourceCurve.keys[i].time - elapsedTime)
-            elapsedTime = sourceCurve.keys[i].time;
-            if (i % 2 == 0) removedCurve.AddKey(sourceCurve.keys[i]);
-        }
-        
-        recordRangeDatas = tmpRecordRangeDatas.ToArray();
-    }
-    
     // リダクション
     private static void Reduction(out AnimationCurve reducedCurve, AnimationCurve sourceCurve, float eps = 1e-4f)
     {
@@ -140,7 +130,7 @@ public class KeyframeReductionTool : AssetPostprocessor
         var dist = 0f;
         for(var  i = 1; i < inKeyframes.Length - 1; i++)
         {
-            var d = Mathf.Sqrt(CalcDistanceSqFromPointToLine(first, inKeyframes[i], last));
+            var d = CalcPerpendicularDistance(first, inKeyframes[i], last);
             if(dist < d)
             {
                 dist = d;
@@ -165,6 +155,7 @@ public class KeyframeReductionTool : AssetPostprocessor
         }
     }
 
+    // イマイチうまく動かなかった（点が一直線上にあるときに消えなかった）
     private static float CalcDistanceSqFromPointToLine(Keyframe start, Keyframe mid, Keyframe end)
     {
         float PointDistanceSq(float x0, float y0, float x1, float y1)
@@ -187,15 +178,42 @@ public class KeyframeReductionTool : AssetPostprocessor
         };
     }
 
+    // 垂直距離
+    private static float CalcPerpendicularDistance(Keyframe start, Keyframe mid, Keyframe end)
+    {
+        if(Mathf.Approximately(start.time, end.time))
+        {
+            return Mathf.Abs(mid.value - start.value);
+        }
+
+        var slope = (end.value - start.value) / (end.time - start.time);
+        var intercept = start.value - slope * start.time;
+        return Mathf.Abs(slope * mid.time + intercept - mid.value) / Mathf.Sqrt(slope * slope + 1);
+    }
+
     // スムージング
     private static void Smoothing(out AnimationCurve smoothedCurve, AnimationCurve sourceCurve, float eps = 0.0001f)
     {
         smoothedCurve = new AnimationCurve();
-        for (var i = 0; i < sourceCurve.keys.Length; i++)
+        foreach (var keyframe in sourceCurve.keys)
         {
-            AnimationUtility.SetKeyLeftTangentMode(sourceCurve, i, AnimationUtility.TangentMode.Auto);
-            AnimationUtility.SetKeyRightTangentMode(sourceCurve, i, AnimationUtility.TangentMode.Auto);
-            if (i % 2 == 0) smoothedCurve.AddKey(sourceCurve.keys[i]);
+            smoothedCurve.AddKey(new Keyframe()
+            {
+                time = keyframe.time,
+                value = keyframe.value,
+                inTangent = keyframe.inTangent,
+                outTangent = keyframe.outTangent,
+                inWeight = keyframe.inWeight,
+                outWeight = keyframe.outWeight,
+                weightedMode = WeightedMode.Both,
+            });
+        }
+
+        for (var i = 0; i < smoothedCurve.keys.Length; i++)
+        {
+            AnimationUtility.SetKeyLeftTangentMode(smoothedCurve, i, AnimationUtility.TangentMode.Linear);
+            AnimationUtility.SetKeyRightTangentMode(smoothedCurve, i, AnimationUtility.TangentMode.Linear);
+            AnimationUtility.SetKeyBroken(smoothedCurve, i, true);
         }
     }
     
