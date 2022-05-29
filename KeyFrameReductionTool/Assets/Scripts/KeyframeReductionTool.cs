@@ -40,7 +40,7 @@ public class KeyframeReductionTool : AssetPostprocessor
             {
                 var curve = AnimationUtility.GetEditorCurve(modifiedClip, binding);
                 
-                Reduction(out var reducedCurve, curve, 0.5f);
+                Reduction(out var reducedCurve, curve, 0.1f);
                 Smoothing(out var smoothedCurve, reducedCurve);
                 newCurveBindings.Add(binding);
                 newCurves.Add(smoothedCurve);
@@ -220,10 +220,8 @@ public class KeyframeReductionTool : AssetPostprocessor
         y[sourceKeyLength - 1] = sourceCurve.keys[sourceKeyLength - 1].value;
         xi[(sourceKeyLength - 1) * 2] = x[sourceKeyLength - 1];
 
-        //StinemanInterpolation(out var yi, x, y, xi);
         FritschCarlson(out var yi, x, y, xi);
         
-        /*
         // Tangentでスムージング
         for (var i = 0; i < sourceKeyLength; i++)
         {
@@ -239,26 +237,6 @@ public class KeyframeReductionTool : AssetPostprocessor
                 inWeight = 0,
                 outWeight = 0,
             });
-        }
-        */
-        for (var i = 0; i < yi.Length; i++)
-        {
-            smoothedCurve.AddKey(new Keyframe()
-            {
-                time = xi[i],
-                value = yi[i],
-                inTangent = 0,
-                outTangent = 0,
-                inWeight = 0,
-                outWeight = 0,
-            });
-        }
-
-        for (var i = 0; i < smoothedCurve.keys.Length; i++)
-        {
-            AnimationUtility.SetKeyLeftTangentMode(smoothedCurve, i, AnimationUtility.TangentMode.Linear);
-            AnimationUtility.SetKeyRightTangentMode(smoothedCurve, i, AnimationUtility.TangentMode.Linear);
-            AnimationUtility.SetKeyBroken(smoothedCurve, i, true);
         }
     }
 
