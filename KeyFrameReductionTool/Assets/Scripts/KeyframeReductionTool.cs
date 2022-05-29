@@ -220,7 +220,8 @@ public class KeyframeReductionTool : AssetPostprocessor
         y[sourceKeyLength - 1] = sourceCurve.keys[sourceKeyLength - 1].value;
         xi[(sourceKeyLength - 1) * 2] = x[sourceKeyLength - 1];
 
-        StinemanInterpolation(out var yi, x, y, xi);
+        //StinemanInterpolation(out var yi, x, y, xi);
+        FritschCarlson(out var yi, x, y, xi);
         
         /*
         // Tangentでスムージング
@@ -261,7 +262,8 @@ public class KeyframeReductionTool : AssetPostprocessor
         }
     }
 
-    // Monotone cubic interpolationの手法の１つであるStineman法の補間
+    // Stineman補間
+    // Ref. https://github.com/jdh2358/py4science/blob/master/examples/extras/steinman_interp.py
     private static void StinemanInterpolation(out float[] yi, float[] x, float[] y, float[] xi, float[] yp = null)
     {
         if (x.Length != y.Length)
@@ -316,6 +318,120 @@ public class KeyframeReductionTool : AssetPostprocessor
                 0 => 0.0f,
                 _ => 1.0f / (dy1 + dy2)
             };
+        }
+    }
+    
+    // Fritsch-Carlson補間
+    // Ref. https://codereview.stackexchange.com/questions/73622/monotone-cubic-interpolation
+    private static void FritschCarlson(out float[] yi, float[] xs, float[] ys, float[] x_interp)
+    {
+        var length = xs.Length;
+
+        // Deal with length issues
+        if (length != ys.Length && length == 0)
+        {
+            yi = null;
+            return;
+        }
+        if (length == 1)
+        {
+            yi = new float[] { ys[0] };;
+            return;
+        }
+        
+        // Get consecutive differences and slopes
+        var delta = new float[length - 1];
+        var m = new float[length];
+
+        for (int i = 0; i < length - 1; i++)
+        {
+            delta[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]);
+            if (i > 0)
+            {
+                m[i] = (delta[i - 1] + delta[i]) / 2;
+            }
+        }
+        var toFix = new List<int>();
+        for (int i = 1; i < length - 1; i++)
+        {
+            if ((delta[i] > 0 && delta[i - 1] < 0) || (delta[i] < 0 && delta[i - 1] > 0))
+            {
+                toFix.Add(i);
+            }
+        }
+        foreach (var val in toFix)
+        {
+            m[val] = 0;
+        }
+
+        m[0] = delta[0];
+        m[length - 1] = delta[length - 2];
+
+        toFix.Clear();
+        for (int i = 0; i < length - 1; i++)
+        {
+            if (delta[i] == 0)
+            {
+                toFix.Add(i);
+            }
+        }
+        foreach (var val in toFix)
+        {
+            m[val] = 0;
+            m[val + 1] = 0;
+        }
+
+        var alpha = new float[length - 1];
+        var beta = new float[length - 1];
+        var dist = new float[length - 1];
+        var tau = new float[length - 1];
+        for (int i = 0; i < length - 1; i++)
+        {
+            alpha[i] = m[i] / delta[i];
+            beta[i] = m[i + 1] / delta[i];
+            dist[i] = Mathf.Pow(alpha[i], 2) + Mathf.Pow(beta[i], 2);
+            tau[i] = 3.0f/Mathf.Sqrt(dist[i]);
+        }
+
+        toFix.Clear();
+        for (int i = 0; i < length - 1; i++)
+        {
+            if (dist[i] > 9)
+            {
+                toFix.Add(i);
+            }
+        }
+
+        foreach (var val in toFix)
+        {
+            m[val] = tau[val] * alpha[val] * delta[val];
+            m[val + 1] = tau[val] * beta[val] * delta[val];
+        }
+
+        yi = new float[x_interp.Length];
+        int ind = 0;
+
+        foreach (var x in x_interp)
+        {
+            int i;
+            for (i = xs.Length - 2; i >= 0; --i)
+            {
+                if (xs[i] <= x)
+                {
+                    break;
+                }
+            }
+            var h = xs[i + 1] - xs[i];
+            var t = (x - xs[i])/h;
+            var t2 = Mathf.Pow(t, 2);
+            var t3 = Mathf.Pow(t, 3);
+            var h00 = 2*t3 - 3*t2 + 1;
+            var h10 = t3 - 2*t2 + t;
+            var h01 = -2*t3 + 3*t2;
+            var h11 = t3 - t2;
+            yi[ind++] = h00*ys[i] + h10*h*m[i] + h01*ys[i + 1] + h11*h*m[i + 1];
+
+            continue;
         }
     }
 
