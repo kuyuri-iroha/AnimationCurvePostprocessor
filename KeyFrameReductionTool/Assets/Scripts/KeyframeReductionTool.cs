@@ -2,24 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 public class KeyframeReductionTool : AssetPostprocessor
 {
     private static readonly string[] RemoveProps = new string[]
     {
-        "Position",
-        "Scale"
     };
-
-    private struct RecordRageData
-    {
-        public int startIndex;
-        public int endIndex;
-    }
     
     [MenuItem("Assets/KeyFrame Reduction")]
     private static void KeyReduction()
@@ -150,7 +140,7 @@ public class KeyframeReductionTool : AssetPostprocessor
             DouglasPeucker(out var resKeys1, in keys1, eps);
             DouglasPeucker(out var resKeys2,in keys2, eps);
             
-            outKeyFrames = resKeys1.Concat(resKeys2).DistinctBy(key => key.time).ToArray();
+            outKeyFrames = resKeys1.Concat(resKeys2).Distinct().ToArray();
         }
         else
         {
@@ -416,12 +406,7 @@ public class KeyframeReductionTool : AssetPostprocessor
     // アニメーションクリップの保存
     private static void WriteAnimationCurve(AnimationClip animClip, string animClipDirectory, string animClipName)
     {
-        var tmpName = $"{animClipDirectory}/{animClip.name}_tmp.anim";
-        
-        var copyClip = Object.Instantiate(animClip);
-        AssetDatabase.CreateAsset(copyClip, tmpName);
-        FileUtil.ReplaceFile(tmpName, $"{animClipDirectory}/{animClipName}_reduced.anim");
-        AssetDatabase.DeleteAsset(tmpName);
+        AssetDatabase.CreateAsset(animClip, $"{animClipDirectory}/{animClip.name}_reduced.anim");
         AssetDatabase.Refresh();
     }
 }
