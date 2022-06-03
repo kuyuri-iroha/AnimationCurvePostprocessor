@@ -30,8 +30,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             };
             epsilon.RegisterValueChangedCallback(evt =>
             {
-                epsilon.value = Mathf.Max(evt.newValue, 1e-4f);
-                _epsilon = epsilon.value;
+                _epsilon = evt.newValue;
             });
             Add(epsilon);
             
@@ -47,7 +46,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             Add(distanceMethod);
         }
         
-        public void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
+        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
         {
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
@@ -63,6 +62,13 @@ namespace Kuyuri.Tools.AnimationPostprocess
                 {
                     keys = reducedKeyframes
                 };
+                
+                for (var i = 0; i < reducedCurve.keys.Length; i++)
+                {
+                    AnimationUtility.SetKeyLeftTangentMode(reducedCurve, i, AnimationUtility.TangentMode.Linear);
+                    AnimationUtility.SetKeyRightTangentMode(reducedCurve, i, AnimationUtility.TangentMode.Linear);
+                    AnimationUtility.SetKeyBroken(reducedCurve, i, true);
+                }
                 
                 newCurveBindings.Add(binding);
                 newCurves.Add(reducedCurve);

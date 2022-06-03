@@ -10,6 +10,8 @@ namespace Kuyuri.Tools.AnimationPostprocess
     public class StinemanSmoothing : Postprocess
     {
         private float _resampleRate = 0.5f;
+        private bool _retentionSourcePoint = false;
+        private bool _onlySetTangent = false;
         
         public StinemanSmoothing()
         {
@@ -22,13 +24,40 @@ namespace Kuyuri.Tools.AnimationPostprocess
             };
             resampleRate.RegisterValueChangedCallback(evt =>
             {
-                resampleRate.value = Mathf.Max(evt.newValue, 1e-4f);
-                _resampleRate = resampleRate.value;
+                _resampleRate = evt.newValue;
+            });
+            resampleRate.RegisterCallback<BlurEvent>(evt =>
+            {
+                resampleRate.value = Mathf.Max(resampleRate.value, 1e-4f);
             });
             Add(resampleRate);
+            
+            var retentionSourcePoint = new Toggle
+            {
+                label = "Retention Source Point",
+                name = "retentionSourcePointToggle",
+                value = false
+            };
+            retentionSourcePoint.RegisterValueChangedCallback(evt =>
+            {
+                _retentionSourcePoint = evt.newValue;
+            });
+            Add(retentionSourcePoint);
+            
+            var onlySetTangent = new Toggle
+            {
+                label = "Only Set Tangent",
+                name = "onlySetTangentToggle",
+                value = false
+            };
+            onlySetTangent.RegisterValueChangedCallback(evt =>
+            {
+                _onlySetTangent = evt.newValue;
+            });
+            Add(onlySetTangent);
         }
         
-        public void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
+        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
         {
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
@@ -41,43 +70,94 @@ namespace Kuyuri.Tools.AnimationPostprocess
                 var sourceKeyLength = curve.keys.Length;
         
                 // キーが3つ未満の場合はスムージングしない
-                if(sourceKeyLength < 3)
+                if(3 <= sourceKeyLength)
+                {
+                    // キーをx, yの配列に展開
+                    var x = new float[sourceKeyLength];
+                    var y = new float[sourceKeyLength];
+                    for(var i = 0; i < sourceKeyLength - 1; i++)
+                    {
+                        x[i] = curve.keys[i].time;
+                        y[i] = curve.keys[i].value;
+                    }
+                    x[^1] = curve.keys[^1].time;
+                    y[^1] = curve.keys[^1].value;
+
+                    // リサンプリング
+                    Utils.Resampling(out var xi, x, _resampleRate);
+                    
+                    // 元のキーを保持
+                    if (_retentionSourcePoint)
+                    {
+                        var tmpXi = new List<float>(xi);
+                        tmpXi.AddRange(x);
+                        xi = tmpXi.Distinct().OrderBy(val => val).ToArray();
+                    }
+                
+                    // 補間
+                    Stineman(out var yi, x, y, xi);
+        
+                    // Tangentを設定してスムージング
+                    if (_onlySetTangent)
+                    {
+                        for (var i = 0; i < x.Length; i++)
+                        {
+                            var interpIndex = Array.BinarySearch(xi, x[i]);
+                            var foundSame = 0 <= interpIndex;
+                            interpIndex = Mathf.Max(interpIndex < 0 ? ~interpIndex - 1 : interpIndex, 0);
+                            var inTangent = 0f;
+                            var outTangent = 0f;
+
+                            if (foundSame)
+                            {
+                                inTangent = 0 < interpIndex ? (yi[interpIndex] - yi[interpIndex - 1]) / (xi[interpIndex] - xi[interpIndex - 1]) : 0;
+                                outTangent = interpIndex < xi.Length - 1 ? (yi[interpIndex + 1] - yi[interpIndex]) / (xi[interpIndex + 1] - xi[interpIndex]) : 0;
+                            }
+                            else
+                            {
+                                inTangent = interpIndex < xi.Length - 1 ? (yi[interpIndex + 1] - yi[interpIndex]) / (xi[interpIndex + 1] - xi[interpIndex]) : 0;
+                                outTangent = inTangent;
+                            }
+                            
+                            smoothedCurve.AddKey(new Keyframe()
+                            {
+                                time = x[i],
+                                value = y[i],
+                                inTangent = inTangent,
+                                outTangent = outTangent,
+                                inWeight = 0,
+                                outWeight = 0
+                            });
+                        }
+                    }
+                    else
+                    {
+                        for (var i = 0; i < xi.Length; i++)
+                        {
+                            var inTangent = 0 < i ? (yi[i] - yi[i - 1]) / (xi[i] - xi[i - 1]) : 0;
+                            var outTangent = i < xi.Length - 1 ? (yi[i + 1] - yi[i]) / (xi[i + 1] - xi[i]) : 0;
+                            smoothedCurve.AddKey(new Keyframe()
+                            {
+                                time = xi[i],
+                                value = yi[i],
+                                inTangent = inTangent,
+                                outTangent = outTangent,
+                                inWeight = 0,
+                                outWeight = 0
+                            });
+                        }
+                    }
+                }
+                else
                 {
                     smoothedCurve.keys = curve.keys.ToArray();
-                    continue;
                 }
-        
-                // キーをx, yの配列に展開
-                var x = new float[sourceKeyLength];
-                var y = new float[sourceKeyLength];
-                for(var i = 0; i < sourceKeyLength - 1; i++)
-                {
-                    x[i] = curve.keys[i].time;
-                    y[i] = curve.keys[i].value;
-                }
-                x[^1] = curve.keys[^1].time;
-                y[^1] = curve.keys[^1].value;
-
-                // リサンプリング
-                Utils.Resampling(out var xi, x, _resampleRate);
                 
-                // 補間
-                Stineman(out var yi, x, y, xi);
-        
-                // Tangentを設定してスムージング
-                for (var i = 0; i < xi.Length; i++)
+                for (var i = 0; i < smoothedCurve.keys.Length; i++)
                 {
-                    var inTangent = 0 < i ? (yi[i] - yi[i - 1]) / (xi[i] - xi[i - 1]) : 0;
-                    var outTangent = i < xi.Length - 1 ? (yi[i + 1] - yi[i]) / (xi[i + 1] - xi[i]) : 0;
-                    smoothedCurve.AddKey(new Keyframe()
-                    {
-                        time = curve.keys[i].time,
-                        value = curve.keys[i].value,
-                        inTangent = inTangent,
-                        outTangent = outTangent,
-                        inWeight = 0,
-                        outWeight = 0,
-                    });
+                    AnimationUtility.SetKeyBroken(smoothedCurve, i, true);
+                    AnimationUtility.SetKeyLeftTangentMode(smoothedCurve, i, AnimationUtility.TangentMode.Free);
+                    AnimationUtility.SetKeyRightTangentMode(smoothedCurve, i, AnimationUtility.TangentMode.Free);
                 }
                 
                 newCurveBindings.Add(binding);

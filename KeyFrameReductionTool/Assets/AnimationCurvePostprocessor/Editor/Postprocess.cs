@@ -5,7 +5,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
 {
     public class Postprocess : VisualElement
     {
-        public void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
+        public virtual void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
         {
             dist = null;
         }

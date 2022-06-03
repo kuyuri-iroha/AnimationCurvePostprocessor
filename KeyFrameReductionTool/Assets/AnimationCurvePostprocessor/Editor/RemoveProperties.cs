@@ -42,7 +42,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             Add(propertyNames);
         }
         
-        public void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
+        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
         {
             var str = new StringBuilder();
             foreach (var propertyName in _propertyNames)
@@ -50,9 +50,6 @@ namespace Kuyuri.Tools.AnimationPostprocess
                 str.AppendLine(propertyName);
             }
             Debug.Log(str);
-
-            dist = source;
-            return;
             
             var refCurveBindings = AnimationUtility.GetCurveBindings(source);
             var newCurveBindings = new List<EditorCurveBinding>();

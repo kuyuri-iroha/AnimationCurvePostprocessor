@@ -54,6 +54,7 @@ namespace Kuyuri.Tools
                     return;
                 }
 
+                exportFileName.SetValueWithoutNotify($"{clip.name}_modified");
                 clipInfo.SetValueWithoutNotify(GetClipInfo(clip));
             });
             
@@ -92,7 +93,21 @@ namespace Kuyuri.Tools
                         throw new ArgumentOutOfRangeException();
                 }
             });
-            
+
+            overWriteToggle.RegisterValueChangedCallback(evt =>
+            {
+                var isOverwrite = evt.newValue;
+                var sourceClip = sourceAnimationClip.value as AnimationClip;
+                exportFileName.SetEnabled(!isOverwrite);
+
+                if (sourceClip != null)
+                {
+                    var postName = isOverwrite ? "" : "_modified";
+                    exportFileName.SetValueWithoutNotify($"{sourceClip.name}{postName}");
+                }
+            });
+
+            executeButton.SetEnabled(false);
             executeButton.RegisterCallback<ClickEvent>(evt =>
             {
                 var sourceClip = sourceAnimationClip.value as AnimationClip;
