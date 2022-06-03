@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Web.WebPages;
 using UnityEditor;
@@ -14,43 +15,28 @@ namespace Kuyuri.Tools.AnimationPostprocess
         public RemoveProperties()
         {
             name = "Remove Properties";
-            var propertyNames = new ListView
+            _propertyNames.Clear();
+            var propertyNames = new TextField()
             {
-                itemsSource = _propertyNames,
-                showAddRemoveFooter = true,
-                selectionType = SelectionType.Multiple,
-                reorderable = false,
-                showBorder = true,
-                showFoldoutHeader = true,
-                showAlternatingRowBackgrounds = AlternatingRowBackground.ContentOnly,
-                showBoundCollectionSize = true
-            };
-            propertyNames.makeItem = () => new TextField()
-            {
+                name = "propertyNames",
+                multiline = true,
                 value = "",
-                multiline = false,
-            };
-            propertyNames.bindItem = (item, index) =>
-            {
-                var textField = item as TextField;
-                textField.value = _propertyNames[index];
-                textField.RegisterValueChangedCallback(evt =>
+                style =
                 {
-                    _propertyNames[index] = evt.newValue;
-                });
+                    minHeight = 42,
+                    maxHeight = 42*3
+                }
             };
+            propertyNames.RegisterValueChangedCallback(evt =>
+            {
+                _propertyNames.Clear();
+                _propertyNames.AddRange(evt.newValue.Split(new[] {'\n'}, StringSplitOptions.RemoveEmptyEntries));
+            });
             Add(propertyNames);
         }
         
         public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
         {
-            var str = new StringBuilder();
-            foreach (var propertyName in _propertyNames)
-            {
-                str.AppendLine(propertyName);
-            }
-            Debug.Log(str);
-            
             var refCurveBindings = AnimationUtility.GetCurveBindings(source);
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
