@@ -62,7 +62,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
             
-            foreach (var binding in AnimationUtility.GetCurveBindings(source).ToArray())
+            foreach (var binding in AnimationUtility.GetCurveBindings(source))
             {
                 var curve = AnimationUtility.GetEditorCurve(source, binding);
                 
@@ -169,8 +169,6 @@ namespace Kuyuri.Tools.AnimationPostprocess
             AnimationUtility.SetEditorCurves(dist, newCurveBindings.ToArray(), newCurves.ToArray());
             EditorUtility.SetDirty(dist);
         }
-
-        
         
         // Fritsch-Carlson補間
         // Ref. https://codereview.stackexchange.com/questions/73622/monotone-cubic-interpolation

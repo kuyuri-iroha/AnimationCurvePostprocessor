@@ -124,6 +124,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             var result = new StringBuilder();
             foreach (var clip in _sourceAnimationClips)
             {
+                if(clip == null) continue;
                 var propCount = AnimationUtility.GetCurveBindings(clip).Count(binding => IsRemove(binding));
                 result.AppendLine($"{clip.name} : Found {propCount} properties.");
             }

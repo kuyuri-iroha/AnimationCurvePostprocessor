@@ -21,6 +21,7 @@ namespace Kuyuri.Tools
             RDPReduction,
             FritschCarlsonSmoothing,
             StinemanSmoothing,
+            SetKeyMode,
         }
 
         private static string FilenameExpression = "$FILENAME";
@@ -62,7 +63,6 @@ namespace Kuyuri.Tools
                 var data = (evt.target as ObjectField)?.userData;
                 if (data == null) return;
                 var clip = evt.newValue as AnimationClip;
-                executeButton.SetEnabled(clip != null);
                 if (clip != null)
                 {
                     _animationClips[(int) data] = clip;
@@ -73,6 +73,8 @@ namespace Kuyuri.Tools
                     _animationClips[(int) data] = null;
                     clipInfo.SetValueWithoutNotify(string.Empty);
                 }
+
+                executeButton.SetEnabled(_animationClips.Any(c => c != null));
             }
             sourceAnimationClips.bindItem = (item, index) =>
             {
@@ -115,31 +117,18 @@ namespace Kuyuri.Tools
                 var method = (Method)evt.newValue;
 
                 methodParameterContainer.Clear();
-                
-                switch (method)
+
+                postprocess = method switch
                 {
-                    case Method.RemoveProperties :
-                        postprocess = new RemoveProperties(_animationClips);
-                        methodParameterContainer.Add(postprocess);
-                        break;
-                    
-                    case Method.RDPReduction:
-                        postprocess = new RDPReduction();
-                        methodParameterContainer.Add(postprocess);
-                        break;
-                    
-                    case Method.FritschCarlsonSmoothing:
-                        postprocess = new FritschCarlsonSmoothing();
-                        methodParameterContainer.Add(postprocess);
-                        break;
-                    
-                    case Method.StinemanSmoothing:
-                        methodParameterContainer.Add(new StinemanSmoothing());
-                        break;
-                    
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
+                    Method.RemoveProperties => new RemoveProperties(_animationClips),
+                    Method.RDPReduction => new RDPReduction(),
+                    Method.FritschCarlsonSmoothing => new FritschCarlsonSmoothing(),
+                    Method.StinemanSmoothing => new StinemanSmoothing(),
+                    Method.SetKeyMode => new SetKeyMode(),
+                    _ => throw new ArgumentOutOfRangeException()
+                };
+
+                methodParameterContainer.Add(postprocess);
             });
 
             overWriteToggle.RegisterValueChangedCallback(evt =>

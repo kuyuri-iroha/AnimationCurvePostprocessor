@@ -51,7 +51,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
             
-            foreach (var binding in AnimationUtility.GetCurveBindings(source).ToArray())
+            foreach (var binding in AnimationUtility.GetCurveBindings(source))
             {
                 var curve = AnimationUtility.GetEditorCurve(source, binding);
                 
