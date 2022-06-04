@@ -1,0 +1,16 @@
+{
+  "name": "com.kuyuri.animationcurve-postprocessor",
+  "version": "1.0.0",
+  "displayName": "AnimationClip Postprocessor",
+  "description": "A tool to apply various postprocessing to AnimationCurve.",
+  "unity": "2022.1",
+  "keywords": [
+    "Tool",
+    "AnimationCurve"
+  ],
+  "author": {
+    "name": "Kuyuri Iroha",
+    "email": "contact.kuyuri.iroha@gmail.com",
+    "url": "https://kuyuri-iroha.com"
+  }
+}

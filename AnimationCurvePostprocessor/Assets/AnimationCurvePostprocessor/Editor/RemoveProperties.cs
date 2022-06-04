@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Web.WebPages;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -114,7 +113,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             var isRemove = false;
             foreach (var propName in _propertyNames)
             {
-                isRemove |= !propName.IsEmpty() && binding.propertyName.Contains(propName);
+                isRemove |= !string.IsNullOrEmpty(propName) && binding.propertyName.Contains(propName);
             }
 
             return isRemove;
