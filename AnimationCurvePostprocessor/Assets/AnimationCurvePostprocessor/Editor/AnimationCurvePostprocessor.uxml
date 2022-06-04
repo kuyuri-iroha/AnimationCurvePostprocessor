@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
-    <uie:ObjectField label="Source Animation Clip" name="sourceAnimationClip" type="UnityEngine.AnimationClip, UnityEngine.AnimationModule" />
+    <ui:ListView focusable="true" name="sourceAnimationClips" header-title="Source Animation Clips" show-add-remove-footer="true" show-foldout-header="true" horizontal-scrolling="false" show-border="true" show-alternating-row-backgrounds="ContentOnly" selection-type="Multiple" />
     <ui:TextField picking-mode="Ignore" readonly="true" multiline="true" name="clipInfo" style="height: auto; min-height: 42px; max-height: 126px;" />
     <ui:EnumField label="Method" type="UnityEngine.TextAlignment, UnityEngine.TextRenderingModule" value="Center" name="methodSelector" />
     <ui:VisualElement name="methodParameterContainer" style="min-height: 42px;" />
@@ -8,7 +8,7 @@
         <ui:Toggle name="overwriteToggle" />
     </ui:VisualElement>
     <ui:VisualElement style="flex-direction: row; flex-grow: initial; justify-content: center; flex-shrink: 1; flex-basis: auto; align-items: stretch; margin-left: 3px; margin-right: 3px; margin-top: 1px; margin-bottom: 1px;">
-        <ui:TextField picking-mode="Ignore" name="exportFileName" style="flex-shrink: 0; flex-grow: 0; flex-basis: 90%; -unity-text-align: upper-right; justify-content: flex-start; flex-direction: row;" />
+        <ui:TextField picking-mode="Ignore" name="exportFileName" text="$FILENAME_modified" value="$FILENAME_modified" style="flex-shrink: 0; flex-grow: 0; flex-basis: 90%; -unity-text-align: upper-right; justify-content: flex-start; flex-direction: row;" />
         <ui:Label tabindex="-1" text=".anim" display-tooltip-when-elided="true" name="fileExtension" style="justify-content: flex-start; align-items: stretch; -unity-text-align: middle-right; flex-basis: 10%;" />
     </ui:VisualElement>
     <ui:Button tabindex="-1" text="Execute" display-tooltip-when-elided="true" name="executeButton" />

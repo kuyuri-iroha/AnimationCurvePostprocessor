@@ -46,13 +46,14 @@ public class AnimationClipPropertyRemover : EditorWindow
         {
             var objectField = (item as ObjectField);
             objectField.value = animationClips[index];
+            objectField.userData = index;
             objectField.RegisterValueChangedCallback((e) =>
             {
                 if(e.newValue != e.previousValue)
                 {
                     InitPlaceHolder();
                 }
-                animationClips[index] = e.newValue as AnimationClip;
+                animationClips[(int)(e.target as ObjectField).userData] = e.newValue as AnimationClip;
             });
             Debug.Log(objectField.value);
         };

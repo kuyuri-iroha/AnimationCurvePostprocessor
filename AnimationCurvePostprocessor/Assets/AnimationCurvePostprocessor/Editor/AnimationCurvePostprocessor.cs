@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Kuyuri.Tools.AnimationPostprocess;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UIElements;
+using Object = UnityEngine.Object;
 
 namespace Kuyuri.Tools
 {
@@ -14,13 +18,16 @@ namespace Kuyuri.Tools
         public enum Method
         {
             RemoveProperties,
-            RDPWithPerpendicularDistance,
+            RDPReduction,
             FritschCarlsonSmoothing,
             StinemanSmoothing,
         }
+
+        private static string FilenameExpression = "$FILENAME";
         
-        [SerializeField]
-        private VisualTreeAsset m_VisualTreeAsset = default;
+        [SerializeField] private VisualTreeAsset m_VisualTreeAsset = default;
+
+        private List<AnimationClip> _animationClips = new List<AnimationClip>(); 
 
         [MenuItem("Tools/AnimationCurvePostprocessor")]
         public static void ShowWindow()
@@ -36,29 +43,70 @@ namespace Kuyuri.Tools
             VisualElement labelFromUxml = m_VisualTreeAsset.Instantiate();
             root.Add(labelFromUxml);
 
-            var sourceAnimationClip = root.Q<ObjectField>("sourceAnimationClip");
+            var sourceAnimationClips = root.Q<ListView>("sourceAnimationClips");
             var clipInfo = root.Q<TextField>("clipInfo");
             var methodSelector = root.Q<EnumField>("methodSelector");
             var methodParameterContainer = root.Q<VisualElement>("methodParameterContainer");
             var overWriteToggle = root.Q<Toggle>("overwriteToggle");
             var exportFileName = root.Q<TextField>("exportFileName");
             var executeButton = root.Q<Button>("executeButton");
-            
-            sourceAnimationClip.RegisterValueChangedCallback(evt =>
+
+            sourceAnimationClips.itemsSource = _animationClips;
+            sourceAnimationClips.makeItem = () => new ObjectField()
             {
+                objectType = typeof(AnimationClip)
+            };
+            
+            void ClipListValueChanged(ChangeEvent<Object> evt)
+            {
+                var data = (evt.target as ObjectField)?.userData;
+                if (data == null) return;
                 var clip = evt.newValue as AnimationClip;
                 executeButton.SetEnabled(clip != null);
-                if (clip == null)
+                if (clip != null)
                 {
-                    clipInfo.SetValueWithoutNotify(string.Empty);
-                    return;
+                    _animationClips[(int) data] = clip;
+                    clipInfo.SetValueWithoutNotify(GetClipInfo(clip));
                 }
-
-                exportFileName.SetValueWithoutNotify($"{clip.name}_modified");
-                clipInfo.SetValueWithoutNotify(GetClipInfo(clip));
-            });
+                else
+                {
+                    _animationClips[(int) data] = null;
+                    clipInfo.SetValueWithoutNotify(string.Empty);
+                }
+            }
+            sourceAnimationClips.bindItem = (item, index) =>
+            {
+                if (item is not ObjectField objectField) return;
+                objectField.value = _animationClips[index];
+                objectField.userData = index;
+                objectField.RegisterValueChangedCallback(ClipListValueChanged);
+            };
+            sourceAnimationClips.unbindItem = (item, index) =>
+            {
+                var textField = item as ObjectField;
+                textField.UnregisterValueChangedCallback(ClipListValueChanged);
+            };
+            sourceAnimationClips.onSelectionChange += objects =>
+            {
+                var animationClips = objects.Cast<AnimationClip>().ToArray();
+                var count = animationClips.Length;
+                switch (count)
+                {
+                    case 0:
+                        clipInfo.SetValueWithoutNotify(string.Empty);
+                        break;
+                    
+                    case 1:
+                        clipInfo.SetValueWithoutNotify(GetClipInfo(animationClips.FirstOrDefault()));
+                        break;
+                    
+                    default:
+                        clipInfo.SetValueWithoutNotify(GetClipsInfo(animationClips));
+                        break;
+                }
+            };
             
-            methodSelector.Init(Method.RDPWithPerpendicularDistance);
+            methodSelector.Init(Method.RDPReduction);
             Postprocess postprocess = new RDPReduction();
             methodParameterContainer.Add(postprocess);
             
@@ -71,11 +119,11 @@ namespace Kuyuri.Tools
                 switch (method)
                 {
                     case Method.RemoveProperties :
-                        postprocess = new RemoveProperties();
+                        postprocess = new RemoveProperties(_animationClips);
                         methodParameterContainer.Add(postprocess);
                         break;
                     
-                    case Method.RDPWithPerpendicularDistance:
+                    case Method.RDPReduction:
                         postprocess = new RDPReduction();
                         methodParameterContainer.Add(postprocess);
                         break;
@@ -96,33 +144,50 @@ namespace Kuyuri.Tools
 
             overWriteToggle.RegisterValueChangedCallback(evt =>
             {
-                var isOverwrite = evt.newValue;
-                var sourceClip = sourceAnimationClip.value as AnimationClip;
-                exportFileName.SetEnabled(!isOverwrite);
-
-                if (sourceClip != null)
-                {
-                    var postName = isOverwrite ? "" : "_modified";
-                    exportFileName.SetValueWithoutNotify($"{sourceClip.name}{postName}");
-                }
+                exportFileName.SetEnabled(!evt.newValue);
             });
 
             executeButton.SetEnabled(false);
             executeButton.RegisterCallback<ClickEvent>(evt =>
             {
-                var sourceClip = sourceAnimationClip.value as AnimationClip;
-                var path = AssetDatabase.GetAssetPath(sourceClip);
-                postprocess.ExecuteToAnimationClip(out var distClip, sourceClip);
-                var newFilename = overWriteToggle.value || string.IsNullOrEmpty(exportFileName.value) ? Path.GetFileNameWithoutExtension(path) : exportFileName.value;
+                var format = new string(Enumerable.Range(1, _animationClips.Count.ToString().Length).Select(x => '0').ToArray());
+                for(var i = 0; i < _animationClips.Count; i++)
+                {
+                    var sourceClip = _animationClips[i];
+                    if(sourceClip == null) continue;
+                    
+                    // 処理の実行
+                    postprocess.ExecuteToAnimationClip(out var distClip, sourceClip);
+                    
+                    // ファイル名の決定
+                    var path = AssetDatabase.GetAssetPath(sourceClip);
+                    var newFilename =
+                        exportFileName.value.Replace(FilenameExpression, Path.GetFileNameWithoutExtension(path));
+                    var fileIndex = _animationClips.Count == 1 ? "" : $"_{i.ToString(format)}";
+                    if (overWriteToggle.value || string.IsNullOrEmpty(exportFileName.value))
+                    {
+                        newFilename = $"{Path.GetFileNameWithoutExtension(path)}";
+                    }
+                    else if (!exportFileName.value.Contains(FilenameExpression))
+                    {
+                        newFilename = $"{newFilename}{fileIndex}";
+                    }
                 
-                WriteAnimationCurve(distClip, Path.GetDirectoryName(path), newFilename);
+                    // 書き出し
+                    WriteAnimationCurve(distClip, Path.GetDirectoryName(path), newFilename);
+
+                    _animationClips[i] = distClip;
+                }
                 
-                sourceAnimationClip.value = distClip;
+                // 入れ替え
+                sourceAnimationClips.RefreshItems();
             });
         }
         
         private static string GetClipInfo(AnimationClip clip)
         {
+            if(null == clip) return string.Empty;
+            
             var propertyCount = 0;
             var keyMax = 0;
             var keyMin = int.MaxValue;
@@ -144,6 +209,51 @@ namespace Kuyuri.Tools
             return info.ToString();
         }
         
+        private static string GetClipsInfo(IEnumerable<AnimationClip> clips)
+        {
+            var frameRateMin = float.MaxValue;
+            var frameRateMax = 0f;
+            var lengthMin = float.MaxValue;
+            var lengthMax = 0f;
+            var propertyCountMin = int.MaxValue;
+            var propertyCountMax = 0;
+            var keyMin = int.MaxValue;
+            var keyMax = 0;
+            
+            foreach (var clip in clips)
+            {
+                if(clip == null) continue;
+                
+                var propertyCount = 0;
+                foreach (var binding in AnimationUtility.GetCurveBindings(clip))
+                {
+                    var curve = AnimationUtility.GetEditorCurve(clip, binding);
+                    keyMin = Mathf.Min(curve.length, keyMin);
+                    keyMax = Mathf.Max(curve.length, keyMax);
+                    propertyCount++;
+                }
+                
+                frameRateMin = Mathf.Min(clip.frameRate, frameRateMin);
+                frameRateMax = Mathf.Max(clip.frameRate, frameRateMax);
+                lengthMin = Mathf.Min(clip.length, lengthMin);
+                lengthMax = Mathf.Max(clip.length, lengthMax);
+                propertyCountMin = Mathf.Min(propertyCount, propertyCountMin);
+                propertyCountMax = Mathf.Max(propertyCount, propertyCountMax);
+            }
+            
+            var info = new StringBuilder();
+            info.AppendLine($"Name: -Multiple selected-");
+            info.AppendLine($"Frame rate min: {frameRateMin}");
+            info.AppendLine($"Frame rate max: {frameRateMax}");
+            info.AppendLine($"Length min: {lengthMin}");
+            info.AppendLine($"Length max: {lengthMax}");
+            info.AppendLine($"Property count min: {propertyCountMin}");
+            info.AppendLine($"Property count max: {propertyCountMax}");
+            info.AppendLine($"Min keyframe: {keyMin}");
+            info.AppendLine($"Max keyframe: {keyMax}");
+            return info.ToString();
+        }
+
         // アニメーションクリップの保存
         private static void WriteAnimationCurve(AnimationClip animClip, string animClipDirectory, string animClipName)
         {

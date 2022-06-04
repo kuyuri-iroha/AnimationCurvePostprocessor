@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Web.WebPages;
 using UnityEditor;
@@ -11,15 +12,57 @@ namespace Kuyuri.Tools.AnimationPostprocess
     public class RemoveProperties : Postprocess
     {
         private List<string> _propertyNames = new List<string>();
-        
-        public RemoveProperties()
+        private IReadOnlyList<AnimationClip> _sourceAnimationClips;
+ 
+        public RemoveProperties(IReadOnlyList<AnimationClip> sourceAnimationClips)
         {
             name = "Remove Properties";
             _propertyNames.Clear();
-            var propertyNames = new TextField()
+            var propertyNames = new ListView
             {
-                name = "propertyNames",
+                itemsSource = _propertyNames,
+                showAddRemoveFooter = true,
+                selectionType = SelectionType.Multiple,
+                reorderable = false,
+                showBorder = true,
+                showFoldoutHeader = true,
+                showAlternatingRowBackgrounds = AlternatingRowBackground.ContentOnly,
+                showBoundCollectionSize = true,
+                headerTitle = "Target Property Names"
+            };
+            propertyNames.makeItem = () => new TextField()
+            {
+                value = "",
+                multiline = false,
+            };
+            
+            void PropertyValueChanged(ChangeEvent<string> evt)
+            {
+                var data = (evt.target as TextField)?.userData;
+                if (data != null)
+                {
+                    _propertyNames[(int) data] = evt.newValue;
+                }
+            }
+            propertyNames.bindItem = (item, index) =>
+            {
+                if (item is not TextField textField) return;
+                textField.value = _propertyNames[index];
+                textField.userData = index;
+                textField.RegisterValueChangedCallback(PropertyValueChanged);
+            };
+            propertyNames.unbindItem = (item, index) =>
+            {
+                var textField = item as TextField;
+                textField.UnregisterValueChangedCallback(PropertyValueChanged);
+            };
+            Add(propertyNames);
+            
+            var predictResult = new TextField()
+            {
+                name = "predictResult",
                 multiline = true,
+                isReadOnly = true,
                 value = "",
                 style =
                 {
@@ -27,58 +70,65 @@ namespace Kuyuri.Tools.AnimationPostprocess
                     maxHeight = 42*3
                 }
             };
-            propertyNames.RegisterValueChangedCallback(evt =>
+            Add(predictResult);
+            
+            propertyNames.RegisterCallback<BlurEvent>(evt =>
             {
-                _propertyNames.Clear();
-                _propertyNames.AddRange(evt.newValue.Split(new[] {'\n'}, StringSplitOptions.RemoveEmptyEntries));
+                predictResult.SetValueWithoutNotify(SearchPredictProperties());
             });
-            Add(propertyNames);
+            
+            _sourceAnimationClips = sourceAnimationClips;
         }
         
         public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
         {
-            var refCurveBindings = AnimationUtility.GetCurveBindings(source);
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
-        
-            var hitCount = 0;
-            foreach (var binding in refCurveBindings)
+
+            foreach (var binding in AnimationUtility.GetCurveBindings(source))
             {
                 var curve =  AnimationUtility.GetEditorCurve(source,binding);
             
                 // 検索文字列が含まれている場合は消す
-                var isRemove = false;
-                foreach (var propName in _propertyNames)
-                {
-                    isRemove |= !propName.IsEmpty() && binding.propertyName.Contains(propName);
-                }
-
+                if (IsRemove(binding)) continue;
+                
                 // Propertyを個別に消すことができないので、消す対象でなかった場合は新規で追加し、値をコピーしないといけない
-                if(!isRemove)
+                var copyEditorCurveBinding = new EditorCurveBinding
                 {
-                    var copyEditorCurveBinding = new EditorCurveBinding
-                    {
-                        type = binding.type,
-                        path = binding.path,
-                        propertyName = binding.propertyName
-                    };
-                    newCurveBindings.Add(copyEditorCurveBinding);
-                    newCurves.Add(curve);
-                }
-                else
-                {
-                    hitCount++;
-                }
+                    type = binding.type,
+                    path = binding.path,
+                    propertyName = binding.propertyName
+                };
+                newCurveBindings.Add(copyEditorCurveBinding);
+                newCurves.Add(curve);
             }
 
-            dist = source;
-            if (hitCount > 0)
+            var newClip = new AnimationClip();
+            AnimationUtility.SetEditorCurves(newClip, newCurveBindings.ToArray(), newCurves.ToArray());
+            EditorUtility.SetDirty(newClip);
+            dist = newClip;
+        }
+
+        private bool IsRemove(in EditorCurveBinding binding)
+        {
+            var isRemove = false;
+            foreach (var propName in _propertyNames)
             {
-                var newClip = new AnimationClip();
-                AnimationUtility.SetEditorCurves(newClip, newCurveBindings.ToArray(), newCurves.ToArray());
-                EditorUtility.SetDirty(newClip);
-                dist = newClip;
+                isRemove |= !propName.IsEmpty() && binding.propertyName.Contains(propName);
             }
+
+            return isRemove;
+        }
+
+        private string SearchPredictProperties()
+        {
+            var result = new StringBuilder();
+            foreach (var clip in _sourceAnimationClips)
+            {
+                var propCount = AnimationUtility.GetCurveBindings(clip).Count(binding => IsRemove(binding));
+                result.AppendLine($"{clip.name} : Found {propCount} properties.");
+            }
+            return result.ToString();
         }
     }
 }
