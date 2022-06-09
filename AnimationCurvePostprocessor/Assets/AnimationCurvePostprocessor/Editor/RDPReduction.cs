@@ -46,7 +46,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             Add(distanceMethod);
         }
         
-        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
+        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source, List<string> targetPropertyNames)
         {
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
@@ -54,6 +54,13 @@ namespace Kuyuri.Tools.AnimationPostprocess
             foreach (var binding in AnimationUtility.GetCurveBindings(source))
             {
                 var curve = AnimationUtility.GetEditorCurve(source, binding);
+
+                if (!IsTargetProperty(binding, targetPropertyNames))
+                {
+                    newCurveBindings.Add(binding);
+                    newCurves.Add(curve);
+                    continue;
+                }
                 
                 var keyframes = curve.keys;
                 DouglasPeucker(out var reducedKeyframes, keyframes, _epsilon, _distanceMethod);

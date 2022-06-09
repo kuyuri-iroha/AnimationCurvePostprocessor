@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -67,7 +68,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             Add(rightTangentMode);
         }
 
-        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
+        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source, List<string> targetPropertyNames)
         {
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
@@ -75,6 +76,13 @@ namespace Kuyuri.Tools.AnimationPostprocess
             foreach (var binding in AnimationUtility.GetCurveBindings(source))
             {
                 var curve = AnimationUtility.GetEditorCurve(source, binding);
+                
+                if (!IsTargetProperty(binding, targetPropertyNames))
+                {
+                    newCurveBindings.Add(binding);
+                    newCurves.Add(curve);
+                    continue;
+                }
 
                 var newCurve = new AnimationCurve();
                 foreach (var key in curve.keys)

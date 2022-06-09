@@ -79,7 +79,7 @@ namespace Kuyuri.Tools.AnimationPostprocess
             _sourceAnimationClips = sourceAnimationClips;
         }
         
-        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source)
+        public override void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source, List<string> targetPropertyNames)
         {
             var newCurveBindings = new List<EditorCurveBinding>();
             var newCurves = new List<AnimationCurve>();
