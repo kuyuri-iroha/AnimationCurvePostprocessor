@@ -352,19 +352,17 @@ namespace Kuyuri.Tools
         {
             _targetPropertyNames.Clear();
             
-            var debugTmp = new StringBuilder();
             foreach (var clip in _animationClips)
             {
                 if(clip == null) continue;
                 
                 foreach (var binding in AnimationUtility.GetCurveBindings(clip))
                 {
-                    debugTmp.AppendLine($"{binding.path}/{binding.propertyName}");
-                    
-                    var evaluationName = _propertySpecifyMode switch {
+                    var evaluationName = _propertySpecifyMode switch 
+                    {
                         PropertySpecifyMode.OnlyPropertyName => binding.propertyName,
                         PropertySpecifyMode.OnlyPath => binding.path,
-                        PropertySpecifyMode.FullPath => $"{binding.path}/{binding.propertyName}",
+                        PropertySpecifyMode.FullPath => GetPropertyFullPath(binding),
                         _ => throw new ArgumentOutOfRangeException()
                     };
                     
@@ -386,12 +384,11 @@ namespace Kuyuri.Tools
                     
                     if (!(matched ^ selectMode) || _propertyNames.Count == 0 || _propertyNames.All(string.IsNullOrEmpty))
                     {
-                        _targetPropertyNames.Add(binding.propertyName);
+                        _targetPropertyNames.Add(GetPropertyFullPath(binding));
                     }
                 }
             }
-
-            Debug.Log(debugTmp);
+            
             _targetPropertyNames = _targetPropertyNames.Distinct().ToList();
         }
 
@@ -402,11 +399,16 @@ namespace Kuyuri.Tools
             foreach (var clip in _animationClips)
             {
                 if(clip == null) continue;
-                var propCount = AnimationUtility.GetCurveBindings(clip).Count(binding => _targetPropertyNames.Exists(targetName => binding.propertyName.Equals(targetName)));
+                var propCount = AnimationUtility.GetCurveBindings(clip).Count(binding => _targetPropertyNames.Exists(targetName => GetPropertyFullPath(binding).Equals(targetName)));
                 result.AppendLine($"{clip.name} : Found {propCount} properties.");
             }
 
             return result.ToString();
+        }
+
+        public static string GetPropertyFullPath(EditorCurveBinding binding)
+        {
+            return $"{binding.path}/{binding.propertyName}";
         }
     }
 }

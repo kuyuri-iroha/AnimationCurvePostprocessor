@@ -10,9 +10,9 @@ namespace Kuyuri.Tools.AnimationPostprocess
         public abstract void ExecuteToAnimationClip(out AnimationClip dist, AnimationClip source, List<string> targetPropertyNames);
         
         // 処理対象のアニメーションプロパティかの判定
-        public static bool IsTargetProperty(EditorCurveBinding binding, List<string> targetPropertyNames)
+        protected static bool IsTargetProperty(EditorCurveBinding binding, List<string> targetPropertyNames)
         {
-            return targetPropertyNames.Exists(targetName => binding.propertyName.Equals(targetName));
+            return targetPropertyNames.Exists(targetName => AnimationCurvePostprocessor.GetPropertyFullPath(binding).Equals(targetName));
         }
     }
 }
