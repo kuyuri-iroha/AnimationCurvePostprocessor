@@ -22,6 +22,7 @@ namespace Kuyuri.Tools
             FritschCarlsonSmoothing,
             StinemanSmoothing,
             SetKeyMode,
+            EqualInterval,
         }
 
         private enum PropertySpecifyMode
@@ -219,6 +220,7 @@ namespace Kuyuri.Tools
                     Method.FritschCarlsonSmoothing => new FritschCarlsonSmoothing(),
                     Method.StinemanSmoothing => new StinemanSmoothing(),
                     Method.SetKeyMode => new SetKeyMode(),
+                    Method.EqualInterval => new EqualInterval(),
                     _ => throw new ArgumentOutOfRangeException()
                 };
 
